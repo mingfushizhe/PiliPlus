@@ -963,4 +963,13 @@ abstract final class Pref {
 
   static bool get saveReply =>
       _setting.get(SettingBoxKey.saveReply, defaultValue: true);
+
+  static bool get muteOnStartup =>
+      _setting.get(SettingBoxKey.muteOnStartup, defaultValue: false);
+
+  static double get volumeBeforeMute =>
+      _setting.get(SettingBoxKey.volumeBeforeMute, defaultValue: 1.0);
+
+  static set volumeBeforeMute(double value) =>
+      _setting.put(SettingBoxKey.volumeBeforeMute, value);
 }

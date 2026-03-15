@@ -59,6 +59,7 @@ import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:collection/collection.dart';
@@ -224,6 +225,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     videoController = plPlayerController.videoController!;
 
     if (PlatformUtils.isMobile) {
+      final savedVolume = Pref.volumeBeforeMute;
+      final isMuteOnStartup = Pref.muteOnStartup;
+      var _volumeRestored = false;
+
       Future.microtask(() async {
         try {
           FlutterVolumeController.updateShowSystemUI(true);
@@ -231,7 +236,14 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
               (await FlutterVolumeController.getVolume())!;
           FlutterVolumeController.addListener((double value) {
             if (mounted && !plPlayerController.volumeInterceptEventStream) {
-              plPlayerController.volume.value = value;
+              if (isMuteOnStartup && !_volumeRestored && value > 0) {
+                _volumeRestored = true;
+                plPlayerController.volume.value = savedVolume;
+                FlutterVolumeController.setVolume(savedVolume);
+              } else {
+                plPlayerController.volume.value = value;
+                if (value == 0) _volumeRestored = false;
+              }
               if (Platform.isIOS && !FlutterVolumeController.showSystemUI) {
                 plPlayerController
                   ..volumeIndicator.value = true
@@ -1895,6 +1907,37 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
               ),
             ),
         ],
+
+        if (Pref.muteOnStartup && !isFullScreen && !plPlayerController.isDesktopPip)
+          Positioned(
+            right: 16,
+            bottom: 80,
+            child: Obx(() {
+              final isMuted = plPlayerController.volume.value == 0;
+              return Offstage(
+                offstage: !isMuted,
+                child: GestureDetector(
+                  onTap: () {
+                    final savedVolume = Pref.volumeBeforeMute;
+                    plPlayerController.setVolume(savedVolume);
+                  },
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.volume_up,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
 
         Obx(() {
           if (plPlayerController.dataStatus.loading ||

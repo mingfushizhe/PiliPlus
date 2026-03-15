@@ -788,32 +788,33 @@ class PlPlayerController with BlockConfigMixin {
         extras['audio-files'] =
             '"${Platform.isWindows ? audio.replaceAll(';', r'\;') : audio.replaceAll(':', r'\:')}"';
       }
-      if (kDebugMode || Platform.isAndroid) {
-        String audioNormalization = AudioNormalization.getParamFromConfig(
-          Pref.audioNormalization,
+    }
+
+    if (kDebugMode || Platform.isAndroid) {
+      String audioNormalization = AudioNormalization.getParamFromConfig(
+        Pref.audioNormalization,
+      );
+      if (volume != null && volume.isNotEmpty) {
+        audioNormalization = audioNormalization.replaceFirstMapped(
+          loudnormRegExp,
+          (i) =>
+              'loudnorm=${volume.format(
+                Map.fromEntries(
+                  i.group(1)!.split(':').map((item) {
+                    final parts = item.split('=');
+                    return MapEntry(parts[0].toLowerCase(), num.parse(parts[1]));
+                  }),
+                ),
+              )}',
         );
-        if (volume != null && volume.isNotEmpty) {
-          audioNormalization = audioNormalization.replaceFirstMapped(
-            loudnormRegExp,
-            (i) =>
-                'loudnorm=${volume.format(
-                  Map.fromEntries(
-                    i.group(1)!.split(':').map((item) {
-                      final parts = item.split('=');
-                      return MapEntry(parts[0].toLowerCase(), num.parse(parts[1]));
-                    }),
-                  ),
-                )}',
-          );
-        } else {
-          audioNormalization = audioNormalization.replaceFirst(
-            loudnormRegExp,
-            AudioNormalization.getParamFromConfig(Pref.fallbackNormalization),
-          );
-        }
-        if (audioNormalization.isNotEmpty) {
-          extras['lavfi-complex'] = '"[aid1] $audioNormalization [ao]"';
-        }
+      } else {
+        audioNormalization = audioNormalization.replaceFirst(
+          loudnormRegExp,
+          AudioNormalization.getParamFromConfig(Pref.fallbackNormalization),
+        );
+      }
+      if (audioNormalization.isNotEmpty) {
+        extras['lavfi-complex'] = '"[aid1] $audioNormalization [ao]"';
       }
     }
 
@@ -839,21 +840,21 @@ class PlPlayerController with BlockConfigMixin {
       SmartDialog.showToast('视频源为空，请重新进入本页面');
       return false;
     }
-    final Map<String, String> extras = {};
-    String video = dataSource.videoSource;
-    if (dataSource.audioSource case final audio? when (audio.isNotEmpty)) {
-      if (onlyPlayAudio.value) {
-        video = audio;
+    String? audioUri;
+    if (!isLive) {
+      if (dataSource.audioSource.isNullOrEmpty) {
+        SmartDialog.showToast('音频源为空');
       } else {
-        extras['audio-files'] =
-            '"${Platform.isWindows ? audio.replaceAll(';', r'\;') : audio.replaceAll(':', r'\:')}"';
+        audioUri = Platform.isWindows
+            ? dataSource.audioSource!.replaceAll(';', '\\;')
+            : dataSource.audioSource!.replaceAll(':', '\\:');
       }
     }
     await _videoPlayerController!.open(
       Media(
-        video,
+        dataSource.videoSource,
         start: position,
-        extras: extras.isEmpty ? null : extras,
+        extras: audioUri == null ? null : {'audio-files': '"$audioUri"'},
       ),
       play: true,
     );
